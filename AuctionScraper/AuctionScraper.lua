@@ -34,15 +34,9 @@ local function CleanItemName(name)
 end
 
 function AuctionScraper:OnInitialize()
-    if not AuctionScraper_Data.auctions then
-        AuctionScraper_Data.auctions = {}
-    end
-    if not AuctionScraper_Data.items then
-        AuctionScraper_Data.items = {}
-    end
-    if not AuctionScraper_Data.scanInfo then
-        AuctionScraper_Data.scanInfo = {}
-    end
+    AuctionScraper_Data.auctions = AuctionScraper_Data.auctions or {}
+    AuctionScraper_Data.items = AuctionScraper_Data.items or {}
+    AuctionScraper_Data.scanInfo = AuctionScraper_Data.scanInfo or {}
     self:Print("AuctionScraper initialized! Use /scan to start scanning.")
 end
 
@@ -62,13 +56,15 @@ function AuctionScraper:StartScan()
     wipe(self.processedPages)
     
     self:Print("Starting Auction House scan!")
-    self:QueryNextPage()
+    self:ScheduleTimer("QueryNextPage", 1)
 end
 
 function AuctionScraper:StopScan(message)
-    self.isScanning = false
-    wipe(self.processedPages)
-    self:Print(message)
+    if self.isScanning then
+        self.isScanning = false
+        wipe(self.processedPages)
+        self:Print(message)
+    end
 end
 
 function AuctionScraper:SlashScan()
@@ -81,57 +77,69 @@ end
 
 function AuctionScraper:QueryNextPage()
     if not self.isScanning or not AuctionFrame:IsShown() then
-        if self.isScanning then
-            self:StopScan("Auction House closed - scan stopped!")
-        end
         return
     end
-    
+
     local currentTime = GetTime()
-    if (currentTime - self.lastScanTime) < 1 then
-        self:ScheduleTimer("QueryNextPage", 1 - (currentTime - self.lastScanTime))
+    if (currentTime - self.lastScanTime) < 2.5 then
+        self:ScheduleTimer("QueryNextPage", 2.5 - (currentTime - self.lastScanTime))
         return
     end
-    
+
     self.lastScanTime = currentTime
-    QueryAuctionItems("", 0, 0, 0, 0, 0, self.currentPage, 0, 0)
+    self.currentPage = self.currentPage + 1
+    QueryAuctionItems("", nil, nil, 0, 0, 0, self.currentPage - 1, false, false)
+    self.lastRequestedPage = self.currentPage
+    self:ScheduleTimer("CheckPageData", 1.5)
+end
+
+function AuctionScraper:CheckPageData()
+    if not CanSendAuctionQuery() then
+        self:Print("Auction data not ready, retrying...")
+        self:ScheduleTimer("CheckPageData", 2)
+        return
+    end
+
+    local numBatchAuctions, totalAuctions = GetNumAuctionItems("list")
+    self.totalPages = math.ceil(totalAuctions / 50)
+
+    if self.lastRequestedPage and self.currentPage ~= self.lastRequestedPage then
+        self:Print("Page data mismatch, retrying...")
+        self:ScheduleTimer("CheckPageData", 1.5)
+        return
+    end
+
+    self:ProcessAuctionData()
 end
 
 function AuctionScraper:ProcessAuctionData()
     if not self.isScanning or not AuctionFrame:IsShown() then
-        if self.isScanning then
-            self:StopScan("Auction House closed - scan stopped!")
-        end
         return
     end
-    
-    if self.currentPage == self.lastProcessedPage then
-        return
-    end
-    
-    self.lastProcessedPage = self.currentPage
+
     local numBatchAuctions, totalAuctions = GetNumAuctionItems("list")
-    
     if totalAuctions == 0 then
         self:Print("No auctions found!")
         self.isScanning = false
         return
     end
-    
+
     self.totalPages = math.ceil(totalAuctions / 50)
-    
-    if not self.processedPages[self.currentPage] then
-        self:Print(("Scanning Page: %d/%d"):format(self.currentPage + 1, self.totalPages))
-        self.processedPages[self.currentPage] = true
+
+    if self.currentPage == self.lastProcessedPage then
+        return
     end
-    
+
+    self.lastProcessedPage = self.currentPage
+    self:Print(("Scanning Page: %d/%d"):format(self.currentPage, self.totalPages))
+    self.processedPages[self.currentPage] = true
+
     for i = 1, numBatchAuctions do
         local name, texture, count, _, _, _, _, _, buyout = GetAuctionItemInfo("list", i)
         local link = GetAuctionItemLink("list", i)
         local id = link and tonumber(link:match("item:(%d+)")) or "N/A"
-        
         local cleanName = CleanItemName(name)
-        
+
         local itemExists = false
         for _, item in ipairs(AuctionScraper_Data.items) do
             if item.entry == id then
@@ -139,7 +147,7 @@ function AuctionScraper:ProcessAuctionData()
                 break
             end
         end
-        
+
         if id ~= "N/A" and not itemExists then
             local cleanTexture = texture and texture:gsub("Interface\\Icons\\", "") or "N/A"
             table.insert(AuctionScraper_Data.items, {
@@ -148,37 +156,42 @@ function AuctionScraper:ProcessAuctionData()
                 icon = cleanTexture
             })
         end
-        
+
         table.insert(AuctionScraper_Data.auctions, {
             entry = id,
             quantity = count or 0,
             price = buyout or 0
         })
-        
     end
-    
+
     if self.currentPage < self.totalPages then
-        self.currentPage = self.currentPage + 1
-        self:ScheduleTimer("QueryNextPage", 1)
-    else
-        AuctionScraper_Data.scanInfo = {
-            ["timestamp"] = time(),
-            ["count"] = #AuctionScraper_Data.auctions
-        }
-        
-        self:Print(("Auction House scan complete! Found %d auctions!"):format(
-            AuctionScraper_Data.scanInfo["count"]))
-        self.isScanning = false
-        wipe(self.processedPages)
+        self:ScheduleTimer("QueryNextPage", 2.5)
+    elseif self.currentPage == self.totalPages then
+        self:ScheduleTimer("FinalPageCheck", 2)
     end
+end
+
+function AuctionScraper:FinalPageCheck()
+    local numBatchAuctions, totalAuctions = GetNumAuctionItems("list")
+    if numBatchAuctions > 0 then
+        self:ProcessAuctionData()
+    end
+    AuctionScraper_Data.scanInfo = {
+        ["timestamp"] = time(),
+        ["count"] = #AuctionScraper_Data.auctions
+    }
+    self:Print(("Auction House scan complete! Found %d auctions!"):format(
+        AuctionScraper_Data.scanInfo["count"]))
+    self.isScanning = false
+    wipe(self.processedPages)
 end
 
 function AuctionScraper:AUCTION_ITEM_LIST_UPDATE()
     if self.isScanning and AuctionFrame:IsShown() then
         local currentTime = GetTime()
-        if not self.lastUpdate or (currentTime - self.lastUpdate) > 0.5 then
+        if not self.lastUpdate or (currentTime - self.lastUpdate) > 1 then
             self.lastUpdate = currentTime
-            self:ScheduleTimer("ProcessAuctionData", 0.1)
+            self:ScheduleTimer("CheckPageData", 0.5)
         end
     end
 end
