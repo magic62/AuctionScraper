@@ -125,7 +125,6 @@ function AuctionScraper:ProcessAuctionData()
         self.processedPages[self.currentPage] = true
     end
     
-    local pageItems = 0
     for i = 1, numBatchAuctions do
         local name, texture, count, _, _, _, _, _, buyout = GetAuctionItemInfo("list", i)
         local link = GetAuctionItemLink("list", i)
@@ -156,7 +155,6 @@ function AuctionScraper:ProcessAuctionData()
             price = buyout or 0
         })
         
-        pageItems = pageItems + (count or 0)
     end
     
     if self.currentPage < self.totalPages then
@@ -165,14 +163,11 @@ function AuctionScraper:ProcessAuctionData()
     else
         AuctionScraper_Data.scanInfo = {
             ["timestamp"] = time(),
-            ["count"] = 0
+            ["count"] = #AuctionScraper_Data.auctions
         }
-        for _, auction in ipairs(AuctionScraper_Data.auctions) do
-            AuctionScraper_Data.scanInfo["count"] = AuctionScraper_Data.scanInfo["count"] + auction.quantity
-        end
         
-        self:Print(("Auction House scan complete! Found %d auctions with %d total items"):format(
-            #AuctionScraper_Data.auctions, AuctionScraper_Data.scanInfo["count"]))
+        self:Print(("Auction House scan complete! Found %d auctions!"):format(
+            AuctionScraper_Data.scanInfo["count"]))
         self.isScanning = false
         wipe(self.processedPages)
     end
