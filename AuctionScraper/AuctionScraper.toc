@@ -1,0 +1,14 @@
+## Interface: 30300
+## Title: AuctionScraper
+## Notes: Scans the Auction House and saves the information.
+## SavedVariables: AuctionScraper_Data
+
+Libs\Ace3\LibStub\LibStub.lua
+Libs\Ace3\CallbackHandler-1.0\CallbackHandler-1.0.lua
+
+Libs\Ace3\AceAddon-3.0\AceAddon-3.0.lua
+Libs\Ace3\AceConsole-3.0\AceConsole-3.0.lua
+Libs\Ace3\AceEvent-3.0\AceEvent-3.0.lua
+Libs\Ace3\AceTimer-3.0\AceTimer-3.0.lua
+
+AuctionScraper.lua
