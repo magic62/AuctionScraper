@@ -55,6 +55,11 @@ function AuctionScraper:StartScan()
     wipe(AuctionScraper_Data.auctions)
     wipe(self.processedPages)
     
+    AuctionScraper_Data.scanInfo = {
+        ["timestamp"] = time(),
+        ["count"] = 0
+    }
+    
     self:Print("Starting Auction House scan!")
     self:ScheduleTimer("QueryNextPage", 1)
 end
@@ -164,6 +169,8 @@ function AuctionScraper:ProcessAuctionData()
         })
     end
 
+    AuctionScraper_Data.scanInfo["count"] = #AuctionScraper_Data.auctions
+
     if self.currentPage < self.totalPages then
         self:ScheduleTimer("QueryNextPage", 2.5)
     elseif self.currentPage == self.totalPages then
@@ -176,10 +183,6 @@ function AuctionScraper:FinalPageCheck()
     if numBatchAuctions > 0 then
         self:ProcessAuctionData()
     end
-    AuctionScraper_Data.scanInfo = {
-        ["timestamp"] = time(),
-        ["count"] = #AuctionScraper_Data.auctions
-    }
     self:Print(("Auction House scan complete! Found %d auctions!"):format(
         AuctionScraper_Data.scanInfo["count"]))
     self.isScanning = false
