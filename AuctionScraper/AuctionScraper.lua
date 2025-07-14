@@ -27,9 +27,13 @@ local suffixes = {
 local function CleanItemName(name)
     if not name then return "N/A" end
     local cleanedName = name
-    for _, suffix in ipairs(suffixes) do
-        cleanedName = cleanedName:gsub(suffix, ""):gsub("%s+", " "):trim()
+    
+    if not name:match("^Scroll") then
+        for _, suffix in ipairs(suffixes) do
+            cleanedName = cleanedName:gsub(suffix, ""):gsub("%s+", " "):trim()
+        end
     end
+    
     return cleanedName ~= "" and cleanedName or "N/A"
 end
 
