@@ -21,7 +21,9 @@ local suffixes = {
     "of the Vision", "of the Ancestor", "of the Nightmare", "of the Battle", "of the Shadow",
     "of the Sun", "of the Moon", "of the Wild", "of Magic", "of the Knight", "of the Seer",
     "of the Foreseer", "of the Thief", "of the Necromancer", "of the Marksman", "of the Squire",
-    "of Restoration", "of Speed"
+    "of Restoration", "of Speed", "of Arcane Wrath", "of Shadow Wrath", "of Fiery Wrath",
+    "of Frozen Wrath", "of Arcane Resistance", "of Frost Resistance", "of Fire Resistance",
+    "of Shadow Resistance", "of Nature Resistance", "of Healing"
 }
 
 local function CleanItemName(name)
